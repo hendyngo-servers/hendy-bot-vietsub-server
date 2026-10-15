@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: hendy_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hendy_network
+
+  api-gateway:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: hendy_api_gateway
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379 # Trỏ thẳng vào tên container redis
+    ports:
+      - "3000:3000"
+    command: node services/api-gateway/dist/server.js
+    depends_on:
+      - redis
+    networks:
+      - hendy_network
+
+  ai-worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: hendy_ai_worker
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    command: node services/ai-worker/dist/worker.js
+    depends_on:
+      - redis
+    networks:
+      - hendy_network
+
+volumes:
+  redis_data:
+
+networks:
+  hendy_network:
+    driver: bridge
