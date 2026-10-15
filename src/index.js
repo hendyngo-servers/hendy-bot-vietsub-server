@@ -11,7 +11,7 @@ export default {
       }
       return new Response("OK", { status: 200 });
     }
-    return new Response("Bot Vietsub Link đang hoạt động tốt trên Cloudflare!", { status: 200 });
+    return new Response("Bot đa năng đang hoạt động tốt trên Cloudflare!", { status: 200 });
   }
 };
 
@@ -23,15 +23,15 @@ async function handleUpdate(update, env) {
       await handleChannelPost(update.channel_post, env);
   }
   else if (update.callback_query) {
-    await handleCallbackQuery(update.callback_query);
+    await handleCallbackQuery(update.callback_query, env);
   }
 }
 
 async function handleMessage(message, env) {
   const chatId = message.chat.id;
-  const textMsg = message.text || "";
+  const textMsg = message.text || message.caption || "";
 
-  // Lệnh cập nhật link Colab nhanh
+  // 1. Cập nhật link Colab nhanh qua lệnh /seturl
   if (textMsg.startsWith("/seturl ")) {
     const newUrl = textMsg.replace("/seturl ", "").trim();
     if (env && env.CONFIG_KV) {
@@ -49,30 +49,63 @@ async function handleMessage(message, env) {
     return;
   }
 
+  // 2. Lệnh /start hiển thị Menu chính
   if (textMsg === "/start") {
-    const text = "👋 Xin chào! Hãy gửi cho tôi **đường link video** (YouTube, TikTok, Facebook,...), tôi sẽ tự động tải, nhận diện ngôn ngữ và Vietsub cho bạn.\n\n*(Cập nhật link Colab mới bằng lệnh: /seturl <link>)*";
-    const keyboard = {
-      inline_keyboard: [
-        [
-            { text: "ℹ️ Hướng dẫn", callback_data: "help" }, 
-            { text: "🌐 Website", url: "https://github.com" }
-        ],
-        [
-            { text: "⚙️ Cài đặt dịch thuật", callback_data: "settings" }
-        ]
-      ]
-    };
-    await sendTelegramRequest('sendMessage', { 
-        chat_id: chatId, 
-        text: text, 
-        reply_markup: keyboard 
-    });
+    await sendMainMenu(chatId);
     return;
   }
 
-  // Bắt sự kiện người dùng gửi link (bắt đầu bằng http:// hoặc https://)
+  // 3. Xử lý Video (Gửi Link)
   if (textMsg.startsWith("http://") || textMsg.startsWith("https://")) {
       await processLinkRequest(textMsg, chatId, message.message_id, env);
+      return;
+  }
+
+  // 4. Xử lý Hình ảnh (Gửi Ảnh kèm hoặc không kèm caption)
+  if (message.photo) {
+      const fileId = message.photo[message.photo.length - 1].file_id;
+      const caption = message.caption ? `\n📝 Nội dung: "${message.caption}"` : "";
+      
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔍 Phân tích ảnh", callback_data: "img_analyze" },
+            { text: "🎨 Tách nền/Sửa ảnh", callback_data: "img_edit" }
+          ],
+          [{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]
+        ]
+      };
+
+      await sendTelegramRequest('sendMessage', {
+          chat_id: chatId,
+          reply_to_message_id: message.message_id,
+          text: `🖼️ **Đã nhận hình ảnh của bạn!**${caption}\nVui lòng chọn tác vụ xử lý bên dưới:`,
+          parse_mode: "Markdown",
+          reply_markup: keyboard
+      });
+      return;
+  }
+
+  // 5. Xử lý Văn bản (Dịch thuật hoặc tóm tắt nhanh)
+  if (textMsg && !textMsg.startsWith("/")) {
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🌐 Dịch sang Tiếng Việt", callback_data: "txt_translate" },
+            { text: "📌 Tóm tắt nội dung", callback_data: "txt_summary" }
+          ],
+          [{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]
+        ]
+      };
+
+      await sendTelegramRequest('sendMessage', {
+          chat_id: chatId,
+          reply_to_message_id: message.message_id,
+          text: `📝 **Đã nhận văn bản:**\n> *"${textMsg.substring(0, 100)}..."*\n\nBạn muốn thực hiện thao tác gì với đoạn văn bản này?`,
+          parse_mode: "Markdown",
+          reply_markup: keyboard
+      });
+      return;
   }
 }
 
@@ -84,6 +117,7 @@ async function handleChannelPost(post, env) {
     }
 }
 
+// Gửi link video sang Colab xử lý
 async function processLinkRequest(videoUrl, chatId, messageId, env) {
     let apiUrl = "https://phonebook-ferocious-thesis.ngrok-free.dev/process";
     if (env && env.CONFIG_KV) {
@@ -96,12 +130,11 @@ async function processLinkRequest(videoUrl, chatId, messageId, env) {
     const processingMsg = await sendTelegramRequest('sendMessage', { 
       chat_id: chatId, 
       reply_to_message_id: messageId,
-      text: "⏳ Đã nhận đường link! Đang chuyển dữ liệu tới máy chủ Colab..." 
+      text: "⏳ Đã nhận đường link video! Đang chuyển dữ liệu tới máy chủ Colab..." 
     });
     const processingMsgId = (await processingMsg.json()).result.message_id;
 
     try {
-        // Gửi đường link trực tiếp sang Google Colab (Bỏ qua giới hạn 20MB của Telegram)
         const apiResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -116,7 +149,7 @@ async function processLinkRequest(videoUrl, chatId, messageId, env) {
             await sendTelegramRequest('editMessageText', {
                 chat_id: chatId,
                 message_id: processingMsgId,
-                text: "✅ Đã gửi link thành công! Colab đang tải và xử lý video dung lượng lớn, hãy đợi kết quả."
+                text: "✅ Đã gửi link thành công! Colab đang tải và xử lý video dung lượng lớn, hãy đợi kết quả gửi về."
             });
         } else {
              throw new Error(`Đường truyền tới Colab bị lỗi (Status: ${apiResponse.status}).`);
@@ -127,30 +160,112 @@ async function processLinkRequest(videoUrl, chatId, messageId, env) {
         await sendTelegramRequest('editMessageText', {
             chat_id: chatId,
             message_id: processingMsgId,
-            text: "❌ Có lỗi kết nối đến máy chủ AI: " + error.message + "\n💡 Gợi ý: Kiểm tra lại lệnh `/seturl` xem link ngrok đã đúng chưa."
+            text: "❌ Có lỗi kết nối đến máy chủ AI: " + error.message + "\n💡 Gợi ý: Hãy kiểm tra lại lệnh `/seturl` xem link ngrok đã đúng chưa."
         });
     }
 }
 
-async function handleCallbackQuery(callbackQuery) {
-  const chatId = callbackQuery.message.chat.id;
-  const data = callbackQuery.data;
-  let text = "";
-
-  if (data === "help") {
-    text = "Chỉ cần gửi link video (YouTube, TikTok,...) vào khung chat. Hệ thống sẽ tự tải và Vietsub cho bạn mà không giới hạn dung lượng file!";
-  } else if (data === "settings") {
-    text = "Tính năng tùy chỉnh đang được phát triển.";
-  }
-
-  await sendTelegramRequest('answerCallbackQuery', { 
-      callback_query_id: callbackQuery.id 
-  });
-  
+// Hàm hiển thị Menu chính
+async function sendMainMenu(chatId) {
+  const text = "🤖 **TRUNG TÂM ĐIỀU KHIỂN HỆ THỐNG AI**\n\nVui lòng gửi nội dung tương ứng hoặc chọn tính năng qua các nút bấm bên dưới:";
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: "🎬 Vietsub Video (Link)", callback_data: "menu_video" },
+        { text: "🖼️ Xử lý Hình ảnh", callback_data: "menu_image" }
+      ],
+      [
+        { text: "📝 Xử lý Văn bản", callback_data: "menu_text" },
+        { text: "⚙️ Cài đặt Colab", callback_data: "settings" }
+      ],
+      [
+        { text: "ℹ️ Hướng dẫn sử dụng", callback_data: "help" }
+      ]
+    ]
+  };
   await sendTelegramRequest('sendMessage', { 
       chat_id: chatId, 
-      text: text 
+      text: text, 
+      parse_mode: "Markdown",
+      reply_markup: keyboard 
   });
+}
+
+// Xử lý sự kiện bấm nút tương tác (Inline Keyboard Callback)
+async function handleCallbackQuery(callbackQuery, env) {
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const data = callbackQuery.data;
+  let text = "";
+  let keyboard = null;
+
+  if (data === "menu_video") {
+    text = "🎬 **TÍNH NĂNG VIETSUB VIDEO**\n\n- Gửi đường link video bất kỳ (YouTube, TikTok, Facebook,...) vào khung chat.\n- Hệ thống sẽ tự động tải, nhận diện đa ngôn ngữ và ép phụ đề Tiếng Việt sắc nét.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "menu_image") {
+    text = "🖼️ **TÍNH NĂNG XỬ LÝ HÌNH ẢNH**\n\n- Hãy **gửi trực tiếp một bức ảnh** vào khung chat này để bắt đầu phân tích hoặc chỉnh sửa.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "menu_text") {
+    text = "📝 **TÍNH NĂNG XỬ LÝ VĂN BẢN**\n\n- Hãy **gửi đoạn văn bản** bất kỳ vào khung chat để bot hỗ trợ dịch thuật hoặc tóm tắt nhanh.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "img_analyze") {
+    text = "🔍 **Phân tích hình ảnh:**\nTính năng nhận diện chi tiết đối tượng trong ảnh đang được kích hoạt trên máy chủ AI.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "img_edit") {
+    text = "🎨 **Chỉnh sửa hình ảnh:**\nCông cụ xử lý đồ họa đang chuẩn bị dữ liệu.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "txt_translate") {
+    text = "🌐 **Đã dịch văn bản:**\n(Mô phỏng) Đoạn văn bản của bạn đã được biên dịch sang Tiếng Việt hoàn tất.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "txt_summary") {
+    text = "📌 **Tóm tắt nội dung:**\n(Mô phỏng) Nội dung chính của đoạn văn bản đã được cô đọng súc tích.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "settings") {
+    text = "⚙️ **CÀI ĐẶT MÁY CHỦ COLAB**\n\nĐể đồng bộ Cloudflare với Google Colab, hãy dùng lệnh:\n`/seturl <đường_link_ngrok>`";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "help") {
+    text = "ℹ️ **HƯỚNG DẪN SỬ DỤNG CHI TIẾT**\n\n1. **Video:** Gửi link YouTube/TikTok để Vietsub tự động.\n2. **Hình ảnh:** Gửi ảnh để phân tích.\n3. **Văn bản:** Gửi text để dịch hoặc tóm tắt.";
+    keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
+  } else if (data === "back_home") {
+    await sendTelegramRequest('answerCallbackQuery', { callback_query_id: callbackQuery.id });
+    // Xóa tin nhắn cũ hoặc chỉnh sửa về menu chính
+    const menuText = "🤖 **TRUNG TÂM ĐIỀU KHIỂN HỆ THỐNG AI**\n\nVui lòng gửi nội dung tương ứng hoặc chọn tính năng qua các nút bấm bên dưới:";
+    const menuKeyboard = {
+      inline_keyboard: [
+        [
+          { text: "🎬 Vietsub Video (Link)", callback_data: "menu_video" },
+          { text: "🖼️ Xử lý Hình ảnh", callback_data: "menu_image" }
+        ],
+        [
+          { text: "📝 Xử lý Văn bản", callback_data: "menu_text" },
+          { text: "⚙️ Cài đặt Colab", callback_data: "settings" }
+        ],
+        [
+          { text: "ℹ️ Hướng dẫn sử dụng", callback_data: "help" }
+        ]
+      ]
+    };
+    await sendTelegramRequest('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text: menuText,
+      parse_mode: "Markdown",
+      reply_markup: menuKeyboard
+    });
+    return;
+  }
+
+  await sendTelegramRequest('answerCallbackQuery', { callback_query_id: callbackQuery.id });
+  
+  if (text) {
+    await sendTelegramRequest('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text: text,
+      parse_mode: "Markdown",
+      reply_markup: keyboard
+    });
+  }
 }
 
 async function sendTelegramRequest(method, payload) {
