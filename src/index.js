@@ -1,5 +1,5 @@
 const BOT_TOKEN = "8574999116:AAF39jSNBiOx-RqIFF08oLxHXqyxsQ9mYqw";
-const VIETSUB_API_URL = "https://car-locking-strategic-rich.trycloudflare.com/process"; 
+const VIETSUB_API_URL = "https://phonebook-ferocious-thesis.ngrok-free.dev/process"; 
 
 export default {
   async fetch(request) {
