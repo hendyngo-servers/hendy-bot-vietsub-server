@@ -1,0 +1,23 @@
+const pollJobStatus = async (jobId: string) => {
+  const interval = setInterval(async () => {
+    try {
+      const response = await axios.get(`https://api.yourdomain.com/v1/subtitles/job/${jobId}`);
+      const { status, data } = response.data;
+
+      if (status === 'completed') {
+        clearInterval(interval);
+        // data chính là mảng SubtitleCue[] -> Đẩy vào Redux Store
+        dispatch(setCues(data));
+        setIsProcessing(false);
+        console.log('Đã nạp phụ đề vào Timeline!');
+      } else if (status === 'failed') {
+        clearInterval(interval);
+        setIsProcessing(false);
+        alert('Lỗi AI dịch thuật. Vui lòng thử lại.');
+      }
+    } catch (err) {
+      console.error(err);
+      clearInterval(interval);
+    }
+  }, 2000); // Mỗi 2 giây hỏi thăm 1 lần
+};
