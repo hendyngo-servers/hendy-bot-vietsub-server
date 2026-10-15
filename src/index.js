@@ -49,8 +49,9 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // 2. Lệnh /start hiển thị Menu chính
+  // 2. Lệnh /start hiển thị Menu chính (Kèm bong bóng đang gõ)
   if (textMsg === "/start") {
+    await sendChatAction(chatId, 'typing');
     await sendMainMenu(chatId);
     return;
   }
@@ -61,9 +62,9 @@ async function handleMessage(message, env) {
       return;
   }
 
-  // 4. Xử lý Hình ảnh (Gửi Ảnh kèm hoặc không kèm caption)
+  // 4. Xử lý Hình ảnh
   if (message.photo) {
-      const fileId = message.photo[message.photo.length - 1].file_id;
+      await sendChatAction(chatId, 'typing');
       const caption = message.caption ? `\n📝 Nội dung: "${message.caption}"` : "";
       
       const keyboard = {
@@ -86,8 +87,9 @@ async function handleMessage(message, env) {
       return;
   }
 
-  // 5. Xử lý Văn bản (Dịch thuật hoặc tóm tắt nhanh)
+  // 5. Xử lý Văn bản
   if (textMsg && !textMsg.startsWith("/")) {
+      await sendChatAction(chatId, 'typing');
       const keyboard = {
         inline_keyboard: [
           [
@@ -117,8 +119,11 @@ async function handleChannelPost(post, env) {
     }
 }
 
-// Gửi link video sang Colab xử lý
+// Xử lý link video và hiển thị hiệu ứng bong bóng "upload_video"
 async function processLinkRequest(videoUrl, chatId, messageId, env) {
+    // Bật bong bóng trạng thái tải/xử lý video
+    await sendChatAction(chatId, 'upload_video');
+
     let apiUrl = "https://phonebook-ferocious-thesis.ngrok-free.dev/process";
     if (env && env.CONFIG_KV) {
       const savedUrl = await env.CONFIG_KV.get("VIETSUB_API_URL");
@@ -165,7 +170,17 @@ async function processLinkRequest(videoUrl, chatId, messageId, env) {
     }
 }
 
-// Hàm hiển thị Menu chính
+// Hàm gửi hiệu ứng bong bóng chat (typing, upload_video,...)
+async function sendChatAction(chatId, action) {
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`;
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, action: action })
+  });
+}
+
+// Hiển thị Menu chính
 async function sendMainMenu(chatId) {
   const text = "🤖 **TRUNG TÂM ĐIỀU KHIỂN HỆ THỐNG AI**\n\nVui lòng gửi nội dung tương ứng hoặc chọn tính năng qua các nút bấm bên dưới:";
   const keyboard = {
@@ -191,13 +206,15 @@ async function sendMainMenu(chatId) {
   });
 }
 
-// Xử lý sự kiện bấm nút tương tác (Inline Keyboard Callback)
 async function handleCallbackQuery(callbackQuery, env) {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
   let text = "";
   let keyboard = null;
+
+  // Kích hoạt bong bóng "đang gõ" khi bấm nút
+  await sendChatAction(chatId, 'typing');
 
   if (data === "menu_video") {
     text = "🎬 **TÍNH NĂNG VIETSUB VIDEO**\n\n- Gửi đường link video bất kỳ (YouTube, TikTok, Facebook,...) vào khung chat.\n- Hệ thống sẽ tự động tải, nhận diện đa ngôn ngữ và ép phụ đề Tiếng Việt sắc nét.";
@@ -228,7 +245,6 @@ async function handleCallbackQuery(callbackQuery, env) {
     keyboard = { inline_keyboard: [[{ text: "🔙 Quay lại Menu", callback_data: "back_home" }]] };
   } else if (data === "back_home") {
     await sendTelegramRequest('answerCallbackQuery', { callback_query_id: callbackQuery.id });
-    // Xóa tin nhắn cũ hoặc chỉnh sửa về menu chính
     const menuText = "🤖 **TRUNG TÂM ĐIỀU KHIỂN HỆ THỐNG AI**\n\nVui lòng gửi nội dung tương ứng hoặc chọn tính năng qua các nút bấm bên dưới:";
     const menuKeyboard = {
       inline_keyboard: [
