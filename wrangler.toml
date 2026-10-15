@@ -1,0 +1,6 @@
+name = "telegram-vietsub-bot"
+main = "src/index.js"
+compatibility_date = "2023-10-15"
+workers_dev = true
+
+# Token sẽ được truyền vào thông qua Cloudflare Secrets (không ghi token thật vào đây)
