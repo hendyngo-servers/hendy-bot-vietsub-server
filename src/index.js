@@ -1,5 +1,7 @@
 const BOT_TOKEN = "8574999116:AAF39jSNBiOx-RqIFF08oLxHXqyxsQ9mYqw";
-const VIETSUB_API_URL = https://phonebook-ferocious-thesis.ngrok-free.dev/process"; 
+
+// DÁN ĐƯỜNG LINK NGROK BẠN VỪA COPY TỪ COLAB VÀO ĐÂY:
+const VIETSUB_API_URL = "https://phonebook-ferocious-thesis.ngrok-free.dev/process"; 
 
 export default {
   async fetch(request) {
@@ -12,7 +14,7 @@ export default {
       }
       return new Response("OK", { status: 200 });
     }
-    return new Response("Bot Telegram đang hoạt động tốt trên Cloudflare Workers!", { status: 200 });
+    return new Response("Bot Vietsub đang hoạt động tốt trên Cloudflare!", { status: 200 });
   }
 };
 
@@ -20,7 +22,6 @@ async function handleUpdate(update) {
   if (update.message) {
     await handleMessage(update.message);
   } 
-  // Xử lý bài đăng trong Channel
   else if (update.channel_post) {
       await handleChannelPost(update.channel_post);
   }
@@ -69,12 +70,12 @@ async function processVideoRequest(videoObj, chatId, messageId) {
     const fileId = videoObj.file_id;
     const fileSize = videoObj.file_size;
 
-    // Telegram giới hạn tải file qua API thông thường là 20MB
+    // Telegram giới hạn tải file qua API thông thường tối đa là 20MB
     if (fileSize > 20 * 1024 * 1024) {
         await sendTelegramRequest('sendMessage', {
             chat_id: chatId,
             reply_to_message_id: messageId,
-            text: "❌ Lỗi: Video quá lớn. Bot chỉ hỗ trợ video dưới 20MB."
+            text: "❌ Lỗi: Video quá lớn. Bot hiện tại chỉ hỗ trợ video dưới 20MB."
         });
         return;
     }
@@ -82,7 +83,7 @@ async function processVideoRequest(videoObj, chatId, messageId) {
     const processingMsg = await sendTelegramRequest('sendMessage', { 
       chat_id: chatId, 
       reply_to_message_id: messageId,
-      text: "⏳ Đang lấy thông tin video và kết nối với Google Colab..." 
+      text: "⏳ Đang kết nối với máy chủ AI Colab..." 
     });
     const processingMsgId = (await processingMsg.json()).result.message_id;
 
@@ -95,21 +96,14 @@ async function processVideoRequest(videoObj, chatId, messageId) {
         const filePath = fileJson.result.file_path;
         const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
 
-        await sendTelegramRequest('editMessageText', {
-            chat_id: chatId,
-            message_id: processingMsgId,
-            text: `📥 Đã kết nối. Đang gửi dữ liệu sang hệ thống AI để dịch. Vui lòng chờ...`
-        });
-
-        // Gửi URL video sang Google Colab
+        // Gửi URL video sang máy chủ AI Google Colab
         const apiResponse = await fetch(VIETSUB_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 video_url: fileUrl,
                 chat_id: chatId,
-                reply_to_message_id: messageId,
-                target_language: "vi"
+                reply_to_message_id: messageId
             })
         });
 
@@ -117,10 +111,10 @@ async function processVideoRequest(videoObj, chatId, messageId) {
             await sendTelegramRequest('editMessageText', {
                 chat_id: chatId,
                 message_id: processingMsgId,
-                text: "✅ Lệnh dịch đã được tiếp nhận tại Colab. Hệ thống đang chạy ngầm và sẽ tự động gửi video vietsub lại đây khi hoàn thành!"
+                text: "✅ Đã truyền dữ liệu thành công! Colab đang tiến hành dịch thuật, video thành phẩm sẽ được gửi lại đây khi hoàn tất."
             });
         } else {
-             throw new Error(`Colab phản hồi lỗi (Mã lỗi: ${apiResponse.status}). Hãy kiểm tra xem Colab còn đang chạy hay không.`);
+             throw new Error(`Đường truyền tới Colab bị lỗi (Status: ${apiResponse.status}).`);
         }
 
     } catch (error) {
@@ -128,7 +122,7 @@ async function processVideoRequest(videoObj, chatId, messageId) {
         await sendTelegramRequest('editMessageText', {
             chat_id: chatId,
             message_id: processingMsgId,
-            text: "❌ Có lỗi kết nối đến máy chủ Colab: " + error.message
+            text: "❌ Có lỗi kết nối đến máy chủ AI: " + error.message
         });
     }
 }
