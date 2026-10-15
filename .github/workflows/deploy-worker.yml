@@ -1,20 +1,42 @@
-name: Deploy Worker
+name: Deploy to Cloudflare
+
 on:
   push:
-    paths:
-      - 'worker/**' # Chỉ deploy lại khi thư mục worker có thay đổi
     branches:
       - main
 
 jobs:
-  deploy:
+  deploy-backend-worker:
     runs-on: ubuntu-latest
-    name: Deploy
     steps:
-      - uses: actions/checkout@v4
-      - name: Publish to Cloudflare Workers
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Backend Deps
+        working-directory: ./backend
+        run: npm install hono @cloudflare/puppeteer
+
+      - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: 'worker'
+          workingDirectory: 'backend'
+          command: deploy
+
+  deploy-frontend-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: 'hendy-frontend'
+          directory: 'frontend'
