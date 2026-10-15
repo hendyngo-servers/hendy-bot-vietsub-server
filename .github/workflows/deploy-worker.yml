@@ -1,4 +1,4 @@
-name: Deploy to Cloudflare
+name: Deploy Bot to Cloudflare Workers
 
 on:
   push:
@@ -6,37 +6,14 @@ on:
       - main
 
 jobs:
-  deploy-backend-worker:
+  deploy:
     runs-on: ubuntu-latest
+    name: Deploy
     steps:
       - uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install Backend Deps
-        working-directory: ./backend
-        run: npm install hono @cloudflare/puppeteer
-
-      - name: Deploy Worker
+      
+      - name: Publish to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          workingDirectory: 'backend'
-          command: deploy
-
-  deploy-frontend-pages:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Deploy Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          projectName: 'hendy-frontend'
-          directory: 'frontend'
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
