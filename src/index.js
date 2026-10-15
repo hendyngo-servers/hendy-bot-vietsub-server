@@ -1,5 +1,5 @@
-// Gắn sẵn Token Bot của bạn
 const BOT_TOKEN = "8574999116:AAF39jSNBiOx-RqIFF08oLxHXqyxsQ9mYqw";
+const VIETSUB_API_URL = "https://phonebook-ferocious-thesis.ngrok-free.dev/process"; 
 
 export default {
   async fetch(request) {
@@ -12,7 +12,6 @@ export default {
       }
       return new Response("OK", { status: 200 });
     }
-    // Dòng này hiển thị khi bạn truy cập trực tiếp link Worker trên trình duyệt
     return new Response("Bot Telegram đang hoạt động tốt trên Cloudflare Workers!", { status: 200 });
   }
 };
@@ -20,7 +19,12 @@ export default {
 async function handleUpdate(update) {
   if (update.message) {
     await handleMessage(update.message);
-  } else if (update.callback_query) {
+  } 
+  // Xử lý bài đăng trong Channel
+  else if (update.channel_post) {
+      await handleChannelPost(update.channel_post);
+  }
+  else if (update.callback_query) {
     await handleCallbackQuery(update.callback_query);
   }
 }
@@ -28,7 +32,6 @@ async function handleUpdate(update) {
 async function handleMessage(message) {
   const chatId = message.chat.id;
 
-  // 1. Xử lý lệnh /start và hiển thị nút bấm (Inline Keyboard)
   if (message.text === "/start") {
     const text = "👋 Xin chào! Hãy gửi cho tôi một video ngắn, tôi sẽ làm Vietsub cho bạn.";
     const keyboard = {
@@ -50,28 +53,84 @@ async function handleMessage(message) {
     return;
   }
 
-  // 2. Xử lý khi người dùng gửi file video
   if (message.video) {
-    const fileId = message.video.file_id;
-    
-    // Phản hồi ngay lập tức để người dùng biết bot đã nhận được video
-    await sendTelegramRequest('sendMessage', { 
-      chat_id: chatId, 
-      text: "⏳ Bot đã nhận được video. Đang tiến hành trích xuất âm thanh và Vietsub. Vui lòng chờ..." 
-    });
-
-    /* 
-      LƯU Ý: Cloudflare Workers không có FFmpeg để xử lý video trực tiếp.
-      Ở hệ thống thực tế, bạn sẽ lấy link file từ fileId, gửi sang một VPS khác để xử lý.
-      Dưới đây là mô phỏng quá trình đó mất 3 giây.
-    */
-    setTimeout(async () => {
-        await sendTelegramRequest('sendMessage', { 
-            chat_id: chatId, 
-            text: "✅ (Mô phỏng) Đã dịch xong! Do đây là môi trường Cloudflare (không có card đồ họa), quá trình render sub cần kết nối với VPS phụ.\n\nFile ID của bạn là: " + fileId
-        });
-    }, 3000);
+      await processVideoRequest(message.video, chatId, message.message_id);
   }
+}
+
+async function handleChannelPost(post) {
+    const chatId = post.chat.id;
+    if (post.video) {
+        await processVideoRequest(post.video, chatId, post.message_id);
+    }
+}
+
+async function processVideoRequest(videoObj, chatId, messageId) {
+    const fileId = videoObj.file_id;
+    const fileSize = videoObj.file_size;
+
+    // Telegram giới hạn tải file qua API thông thường là 20MB
+    if (fileSize > 20 * 1024 * 1024) {
+        await sendTelegramRequest('sendMessage', {
+            chat_id: chatId,
+            reply_to_message_id: messageId,
+            text: "❌ Lỗi: Video quá lớn. Bot chỉ hỗ trợ video dưới 20MB."
+        });
+        return;
+    }
+
+    const processingMsg = await sendTelegramRequest('sendMessage', { 
+      chat_id: chatId, 
+      reply_to_message_id: messageId,
+      text: "⏳ Đang lấy thông tin video và kết nối với Google Colab..." 
+    });
+    const processingMsgId = (await processingMsg.json()).result.message_id;
+
+    try {
+        const fileData = await sendTelegramRequest('getFile', { file_id: fileId });
+        const fileJson = await fileData.json();
+        
+        if (!fileJson.ok) throw new Error("Không thể lấy file từ Telegram.");
+
+        const filePath = fileJson.result.file_path;
+        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
+
+        await sendTelegramRequest('editMessageText', {
+            chat_id: chatId,
+            message_id: processingMsgId,
+            text: `📥 Đã kết nối. Đang gửi dữ liệu sang hệ thống AI để dịch. Vui lòng chờ...`
+        });
+
+        // Gửi URL video sang Google Colab
+        const apiResponse = await fetch(VIETSUB_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                video_url: fileUrl,
+                chat_id: chatId,
+                reply_to_message_id: messageId,
+                target_language: "vi"
+            })
+        });
+
+        if (apiResponse.ok) {
+            await sendTelegramRequest('editMessageText', {
+                chat_id: chatId,
+                message_id: processingMsgId,
+                text: "✅ Lệnh dịch đã được tiếp nhận tại Colab. Hệ thống đang chạy ngầm và sẽ tự động gửi video vietsub lại đây khi hoàn thành!"
+            });
+        } else {
+             throw new Error(`Colab phản hồi lỗi (Mã lỗi: ${apiResponse.status}). Hãy kiểm tra xem Colab còn đang chạy hay không.`);
+        }
+
+    } catch (error) {
+        console.error(error);
+        await sendTelegramRequest('editMessageText', {
+            chat_id: chatId,
+            message_id: processingMsgId,
+            text: "❌ Có lỗi kết nối đến máy chủ Colab: " + error.message
+        });
+    }
 }
 
 async function handleCallbackQuery(callbackQuery) {
@@ -79,26 +138,22 @@ async function handleCallbackQuery(callbackQuery) {
   const data = callbackQuery.data;
   let text = "";
 
-  // Xử lý logic khi bấm nút
   if (data === "help") {
-    text = "Bạn chỉ cần gửi hoặc forward (chuyển tiếp) 1 video vào khung chat này. Hệ thống sẽ tự động làm phần còn lại.";
+    text = "Bạn chỉ cần gửi hoặc forward (chuyển tiếp) 1 video vào khung chat này. Hệ thống sẽ kết nối với Colab để tự động làm phần còn lại.";
   } else if (data === "settings") {
-    text = "Tính năng tùy chỉnh phông chữ và màu sắc Vietsub đang được phát triển.";
+    text = "Tính năng tùy chỉnh đang được phát triển.";
   }
 
-  // Phản hồi cho Telegram biết đã nhận click (nếu không nút bấm sẽ hiện trạng thái loading mờ)
   await sendTelegramRequest('answerCallbackQuery', { 
       callback_query_id: callbackQuery.id 
   });
   
-  // Gửi tin nhắn chứa nội dung tương ứng với nút
   await sendTelegramRequest('sendMessage', { 
       chat_id: chatId, 
       text: text 
   });
 }
 
-// Hàm gửi request giao tiếp với API của Telegram
 async function sendTelegramRequest(method, payload) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
   return fetch(url, {
