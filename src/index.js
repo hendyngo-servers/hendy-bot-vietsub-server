@@ -249,7 +249,7 @@ class AISessionManager {
         }
         saveDatabase();
 
-        this.broadcastLog(`[AI ENGINE] Khởi tạo luồng ${sessionId} chạy đơn #${order.id} cho link: ${order.link}`);
+        this.broadcastLog(`[AI ENGINE] Khởi tạo luồng ${sessionId} chạy đơn #${order.id} cho link:${order.link}`);
         this.broadcastSessionState();
         this.broadcastOrderUpdate();
         this.runWorkerSession(sessionId, order);
@@ -276,7 +276,7 @@ class AISessionManager {
                 }
                 saveDatabase();
 
-                this.broadcastLog(`[AI ENGINE] ✅ Phiên ${sessionId} hoàn thành! Đã bơm ${targetQty} cho ${order.link}`);
+                this.broadcastLog(`[AI ENGINE] ✅ Phiên ${sessionId} hoàn thành! Đã bơm ${targetQty} cho${order.link}`);
                 this.broadcastOrderUpdate();
                 
                 this.activeSessions.delete(sessionId);
@@ -330,7 +330,6 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', system: 'Master Control Panel V6100' });
 });
 
-// Endpoint nhận lệnh cào dữ liệu từ Cloudflare Worker (Puppeteer)
 app.post('/api/smm/run-puppeteer', verifyInternalSecret, async (req, res) => {
     const { targetUrl, chatId } = req.body;
     if (!targetUrl) {
@@ -339,7 +338,7 @@ app.post('/api/smm/run-puppeteer', verifyInternalSecret, async (req, res) => {
 
     let browser = null;
     try {
-        aiEngine.broadcastLog(`[PUPPETEER] Bắt đầu cào dữ liệu cho URL: ${targetUrl} (ChatID: ${chatId || 'API'})`);
+        aiEngine.broadcastLog(`[PUPPETEER] Bắt đầu cào dữ liệu cho URL: ${targetUrl} (ChatID:${chatId || 'API'})`);
         
         let puppeteer;
         try {
@@ -764,6 +763,29 @@ function setupBotLogic() {
             });
             kb.push([{ text: '◀ Quay lại', callback_data: 'back_start' }]);
             bot.editMessageText(textMenu, { chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
+        }
+        else if (data.startsWith('page_')) {
+            const brandName = data.replace('page_', '');
+            const brandList = u.linkedAccounts && u.linkedAccounts[brandName] ? u.linkedAccounts[brandName] : [];
+            let text = `🎟️ *THÔNG TIN TÀI KHOẢN / CODE: ${brandName}*\n--------------------------------------------------\n`;
+            
+            if (brandList.length === 0) {
+                text += `_Bạn chưa có tài khoản hoặc mã code nào liên kết với thương hiệu này._\n`;
+            } else {
+                brandList.forEach((acc, index) => {
+                    text += `${index + 1}. \`${acc}\`\n`;
+                });
+            }
+
+            let kb = [
+                [{ text: '➕ Thêm / Nhập Code mới', callback_data: `add_code_${brandName}` }],
+                [{ text: '◀ Quay lại Trung tâm mua code', callback_data: 'buy_code' }]
+            ];
+            bot.editMessageText(text, { chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
+        }
+        else if (data.startsWith('add_code_')) {
+            const brandName = data.replace('add_code_', '');
+            bot.sendMessage(chatId, `🎟️ Vui lòng gửi mã code hoặc tài khoản thuộc thương hiệu *${brandName}* mà bạn muốn thêm vào hệ thống:`, { parse_mode: 'Markdown' }).catch(() => {});
         }
         else if (data === 'back_start') {
             if (u.actionState) delete u.actionState;
