@@ -1,7 +1,7 @@
 const BOT_TOKEN = "8574999116:AAF39jSNBiOx-RqIFF08oLxHXqyxsQ9mYqw";
 
 // DÁN ĐƯỜNG LINK NGROK BẠN VỪA COPY TỪ COLAB VÀO ĐÂY:
-const VIETSUB_API_URL = "https://phonebook-ferocious-thesis.ngrok-free.dev/process"; 
+const VIETSUB_API_URL = "https://car-locking-strategic-rich.trycloudflare.com/process"; 
 
 export default {
   async fetch(request) {
