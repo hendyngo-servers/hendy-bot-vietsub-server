@@ -1,0 +1,10 @@
+/* Optional styles for StudioHomePage; import when mounting that route. */
+.studio-home-page{max-width:900px;margin:8vh auto;padding:40px;border:1px solid #303039;border-radius:24px;background:#1b1b21;color:#f7f7fb}
+.studio-home-mark{display:grid;place-items:center;width:54px;height:54px;border-radius:16px;background:#343044;color:#c3a8ff}
+.studio-home-page .eyebrow{margin:24px 0 8px;color:#b8a5ff;font-size:11px;letter-spacing:.14em}
+.studio-home-page h1{font-size:clamp(28px,4vw,44px);margin:0 0 12px}
+.studio-home-copy{max-width:600px;color:#b7b7c4;line-height:1.6}
+.studio-home-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:28px 0}
+.studio-home-features>div{display:grid;gap:8px;padding:16px;border:1px solid #34343f;border-radius:14px}
+.studio-home-features svg{color:#b8a5ff}.studio-home-features span,.studio-home-page>small{color:#a4a4b2;font-size:12px}
+@media(max-width:650px){.studio-home-page{margin:16px;padding:22px}.studio-home-features{grid-template-columns:1fr}}
