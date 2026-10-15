@@ -7,13 +7,17 @@ node_compat = true
 [vars]
 ADMIN_ID = "6138197737"
 INTERNAL_SECRET = "hendy_secret_key_2026"
-# BOT_TOKEN lưu vào CF Secrets, không lưu ở đây
+# LƯU Ý: Không ghi BOT_TOKEN ở đây. Hãy lưu vào CF Secrets để bảo mật.
 
 # Khai báo Cloudflare KV (Thay thế cho database.json)
 [[kv_namespaces]]
-binding = "DB"
-id = "MÃ_ID_KV_CỦA_BẠN" # Tạo bằng lệnh: npx wrangler kv:namespace create DB
+binding = "HENDY_DB"
+id = "THAY_BANG_ID_KV_CUA_BAN" # Tạo bằng lệnh: npx wrangler kv:namespace create HENDY_DB
 
 # Kích hoạt Puppeteer (Browser Rendering)
 [browser]
 binding = "MYBROWSER"
+
+# Cấu hình Cron Trigger để AI Engine chạy mỗi phút (Thay thế cho setInterval)
+[triggers]
+crons = ["* * * * *"]
