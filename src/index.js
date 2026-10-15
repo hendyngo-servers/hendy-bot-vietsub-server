@@ -23,7 +23,7 @@ async function handleUpdate(update, env) {
       await handleChannelPost(update.channel_post, env);
   }
   else if (update.callback_query) {
-    await handleCallbackQuery(update.callback_query, env);
+      await handleCallbackQuery(update.callback_query, env);
   }
 }
 
@@ -49,7 +49,7 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // 2. Lệnh /start hiển thị Menu chính (Kèm bong bóng đang gõ)
+  // 2. Lệnh /start hiển thị Menu chính
   if (textMsg === "/start") {
     await sendChatAction(chatId, 'typing');
     await sendMainMenu(chatId);
@@ -119,9 +119,8 @@ async function handleChannelPost(post, env) {
     }
 }
 
-// Xử lý link video và hiển thị hiệu ứng bong bóng "upload_video"
+// Xử lý link video và hiển thị hiệu ứng bong bóng tải video
 async function processLinkRequest(videoUrl, chatId, messageId, env) {
-    // Bật bong bóng trạng thái tải/xử lý video
     await sendChatAction(chatId, 'upload_video');
 
     let apiUrl = "https://phonebook-ferocious-thesis.ngrok-free.dev/process";
@@ -170,7 +169,7 @@ async function processLinkRequest(videoUrl, chatId, messageId, env) {
     }
 }
 
-// Hàm gửi hiệu ứng bong bóng chat (typing, upload_video,...)
+// Hàm gửi hiệu ứng bong bóng chat
 async function sendChatAction(chatId, action) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendChatAction`;
   await fetch(url, {
@@ -206,6 +205,7 @@ async function sendMainMenu(chatId) {
   });
 }
 
+// Xử lý toàn bộ sự kiện bấm nút (Inline Keyboard Callback)
 async function handleCallbackQuery(callbackQuery, env) {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
@@ -213,7 +213,6 @@ async function handleCallbackQuery(callbackQuery, env) {
   let text = "";
   let keyboard = null;
 
-  // Kích hoạt bong bóng "đang gõ" khi bấm nút
   await sendChatAction(chatId, 'typing');
 
   if (data === "menu_video") {
