@@ -1,0 +1,19 @@
+name = "hendy-master-worker"
+main = "src/index.js"
+compatibility_date = "2024-03-20"
+node_compat = true
+
+# Cấu hình biến môi trường
+[vars]
+ADMIN_ID = "6138197737"
+INTERNAL_SECRET = "hendy_secret_key_2026"
+# BOT_TOKEN lưu vào CF Secrets, không lưu ở đây
+
+# Khai báo Cloudflare KV (Thay thế cho database.json)
+[[kv_namespaces]]
+binding = "DB"
+id = "MÃ_ID_KV_CỦA_BẠN" # Tạo bằng lệnh: npx wrangler kv:namespace create DB
+
+# Kích hoạt Puppeteer (Browser Rendering)
+[browser]
+binding = "MYBROWSER"
