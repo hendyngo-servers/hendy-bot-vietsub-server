@@ -1,0 +1,15 @@
+name = "hendy-api"
+main = "src/index.js"
+compatibility_date = "2023-10-30"
+
+# Cấu hình KV Database
+[[kv_namespaces]]
+binding = "DB"
+id = "TẠO_ID_TRÊN_DASHBOARD_VÀ_DÁN_VÀO_ĐÂY"
+
+# Cấu hình Puppeteer (Browser Rendering)
+browser = { binding = "MYBROWSER" }
+
+[vars]
+# Mật khẩu nội bộ
+INTERNAL_SECRET = "hendy_secret_key_2026"
